@@ -820,10 +820,13 @@ class DurableJournal:
         Make a retry ask the model again for the final answer of top-level run ``number``.
 
         See :meth:`DurableRun.ask_model_again`. The top-level runs after it followed from that
-        answer, so they are deleted: a retry starts them over.
+        answer, so they are deleted: a retry starts them over. A run not on the run list recorded
+        nothing, since a run's steps are written only once it is listed, and runs from its start
+        anyway; a note for it would be on no list either, so nothing would ever delete it.
         """
         self.drop_runs_from(number + 1)
-        DurableRun(self, str(number)).ask_model_again()
+        if str(number) in self._load_known_runs():
+            DurableRun(self, str(number)).ask_model_again()
 
     def drop_runs_from(self, number: int) -> None:
         """
@@ -883,12 +886,17 @@ class DurableJournal:
         if self._known_runs and len(self._known_runs) < len(known):
             self.storage.save_step(RUNS_KEY, {"runs": self._known_runs})
 
-    def log_summary(self, logger: logging.Logger | Any) -> None:
-        """Log what this attempt replayed and recorded, and which steps a retry would run again."""
+    def log_summary(self, logger: logging.Logger | Any, *, mode: str) -> None:
+        """
+        Log what this attempt replayed and recorded, and which steps a retry would run again.
+
+        :param mode: How durable execution was turned on, such as ``"on by default"``.
+        """
         replayed, recorded = self.stats.replayed, self.stats.recorded
         logger.info(
-            "Durable: replayed %d steps (%d model, %d tool, %d other), recorded %d new steps "
+            "Durable (%s): replayed %d steps (%d model, %d tool, %d other), recorded %d new steps "
             "(%d model, %d tool, %d other)",
+            mode,
             replayed.total(),
             replayed["model"],
             replayed["tool"],
