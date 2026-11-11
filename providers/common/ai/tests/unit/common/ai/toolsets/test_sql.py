@@ -30,7 +30,8 @@ from pydantic_core import ValidationError
 from sqlalchemy.engine.reflection import Inspector
 from sqlalchemy.exc import OperationalError
 
-from airflow.providers.common.ai.toolsets.sql import SQLToolset, _ConnectionFailed
+from airflow.providers.common.ai.exceptions import SQLToolsetConnectionError
+from airflow.providers.common.ai.toolsets.sql import SQLToolset
 from airflow.providers.common.ai.utils.tool_definition import _SUPPORTS_RETURN_SCHEMA
 from airflow.providers.common.sql.hooks.sql import DbApiHook
 
@@ -663,7 +664,7 @@ class TestSQLToolsetHookResolution:
 
         ts = SQLToolset("bad_conn")
 
-        with pytest.raises(_ConnectionFailed, match="does not provide a DbApiHook"):
+        with pytest.raises(SQLToolsetConnectionError, match="does not provide a DbApiHook"):
             ts._get_db_hook()
 
     @patch("airflow.providers.common.ai.toolsets.sql.BaseHook", autospec=True)
@@ -697,7 +698,9 @@ class TestSQLToolsetConnectionFailures:
 
         with (
             sqlite_connection("warehouse", tmp_path / "missing" / "warehouse.db"),
-            pytest.raises(_ConnectionFailed, match="connection 'warehouse': .*unable to open database file"),
+            pytest.raises(
+                SQLToolsetConnectionError, match="connection 'warehouse': .*unable to open database file"
+            ),
         ):
             _call(ts, name, tool_args)
 
@@ -712,7 +715,7 @@ class TestSQLToolsetConnectionFailures:
 
     @pytest.mark.parametrize(
         ("connection_invalidated", "expected"),
-        [(True, _ConnectionFailed), (False, ModelRetry)],
+        [(True, SQLToolsetConnectionError), (False, ModelRetry)],
         ids=["connection-lost", "statement-rejected"],
     )
     def test_introspection_error_raises_only_when_the_connection_was_lost(
@@ -736,7 +739,7 @@ class TestSQLToolsetConnectionFailures:
         with (
             sqlite_connection("warehouse", tmp_path / "warehouse.db"),
             pytest.raises(
-                _ConnectionFailed,
+                SQLToolsetConnectionError,
                 match="Could not reach the database of connection 'missing': .*isn't defined",
             ),
         ):
@@ -753,7 +756,7 @@ class TestSQLToolsetConnectionFailures:
         with (
             sqlite_connection("warehouse", tmp_path / "warehouse.db"),
             patch.object(SQLiteFileHook, "get_uri", autospec=True, return_value="nosuchdialect://"),
-            pytest.raises(_ConnectionFailed, match="connection 'warehouse': .*nosuchdialect"),
+            pytest.raises(SQLToolsetConnectionError, match="connection 'warehouse': .*nosuchdialect"),
         ):
             _call(ts, name, tool_args)
 
@@ -778,7 +781,9 @@ class TestSQLToolsetConnectionFailures:
                 autospec=True,
                 side_effect=RuntimeError("token endpoint unreachable"),
             ),
-            pytest.raises(_ConnectionFailed, match="connection 'warehouse': token endpoint unreachable"),
+            pytest.raises(
+                SQLToolsetConnectionError, match="connection 'warehouse': token endpoint unreachable"
+            ),
         ):
             _call(ts, name, tool_args)
 
@@ -797,7 +802,7 @@ class TestSQLToolsetConnectionFailures:
                     f"could not open postgresql://svc:{registered_secret}@db"
                 ),
             ),
-            pytest.raises(_ConnectionFailed) as exc_info,
+            pytest.raises(SQLToolsetConnectionError) as exc_info,
         ):
             _call(ts, "query", {"sql": "SELECT 1"})
 

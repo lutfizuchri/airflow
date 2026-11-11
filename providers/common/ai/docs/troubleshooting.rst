@@ -54,8 +54,9 @@ Model and connection errors
     connection is not defined, the host is unreachable, the credentials were rejected,
     the driver or SQLAlchemy dialect failed to load or connect, or the connection was
     lost while listing tables or reading a schema.
-    The attempt fails instead of handing the error to the model, and Airflow's retry
-    runs the call again. The driver's own message follows the colon. A connection that
+    The attempt fails with ``SQLToolsetConnectionError`` instead of handing the error to
+    the model, and Airflow's retry runs the call again. The driver's own message follows
+    the colon. A connection that
     is not defined, or a SQLAlchemy dialect that is not installed, fails every retry the
     same way: define the connection or install the package. See :doc:`toolsets/sql`.
 

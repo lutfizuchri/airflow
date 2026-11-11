@@ -47,8 +47,8 @@ from pydantic_ai.usage import RequestUsage, RunUsage, UsageLimits
 
 from airflow.providers.common.ai.durable import AirflowDurability
 from airflow.providers.common.ai.durable.journal import DurableJournal, journal_scope
-from airflow.providers.common.ai.exceptions import DurableJournalError
-from airflow.providers.common.ai.toolsets.sql import SQLToolset, _ConnectionFailed
+from airflow.providers.common.ai.exceptions import DurableJournalError, SQLToolsetConnectionError
+from airflow.providers.common.ai.toolsets.sql import SQLToolset
 from airflow.providers.common.ai.utils.toolset_base import AirflowToolset, ensure_masked
 
 from unit.common.ai.sqlite_connection import create_orders_table, run_sql, sqlite_connection
@@ -592,7 +592,7 @@ class TestSQLToolsetErrors:
         with sqlite_connection("warehouse", path):
             # A model handed the failure would answer with it; the attempt fails instead.
             with pytest.raises(
-                _ConnectionFailed, match="connection 'warehouse': .*unable to open database file"
+                SQLToolsetConnectionError, match="connection 'warehouse': .*unable to open database file"
             ):
                 await attempt(memory_storage, self._agent(model_fn))
             create_orders_table(path)

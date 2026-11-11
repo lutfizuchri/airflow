@@ -42,6 +42,7 @@ from pydantic_ai.exceptions import ModelRetry
 from pydantic_ai.tools import ToolDefinition
 from pydantic_ai.toolsets.abstract import ToolsetTool
 
+from airflow.providers.common.ai.exceptions import SQLToolsetConnectionError
 from airflow.providers.common.ai.utils.masking import dumps_masked
 from airflow.providers.common.ai.utils.query_results import (
     DEFAULT_MAX_COLUMNS,
@@ -107,12 +108,8 @@ _CHECK_QUERY_SCHEMA: dict[str, Any] = {
 }
 
 
-class _ConnectionFailed(Exception):
-    """The toolset could not get a connection to its database, which no change to the SQL can fix."""
-
-
-def _unreachable(conn_id: str, error: Exception) -> _ConnectionFailed:
-    return _ConnectionFailed(f"Could not reach the database of connection {conn_id!r}: {error}")
+def _unreachable(conn_id: str, error: Exception) -> SQLToolsetConnectionError:
+    return SQLToolsetConnectionError(f"Could not reach the database of connection {conn_id!r}: {error}")
 
 
 def _raise_connection_failures(get_conn: Callable[[], Any], conn_id: str) -> Callable[[], Any]:
@@ -418,7 +415,7 @@ class SQLToolset(AirflowToolset):
             except Exception as e:
                 raise _unreachable(self._db_conn_id, e) from e
             if not isinstance(hook, DbApiHook):
-                raise _ConnectionFailed(
+                raise SQLToolsetConnectionError(
                     f"Connection {self._db_conn_id!r} does not provide a DbApiHook. "
                     f"Got {type(hook).__name__}."
                 )
@@ -484,7 +481,7 @@ class SQLToolset(AirflowToolset):
             raise ValueError(f"Unknown tool: {name!r}")
         try:
             return await self.run_blocking(self._run_tool, name, tool_args)
-        except _ConnectionFailed:
+        except SQLToolsetConnectionError:
             # Handed to the model as a retry, a connection failure makes it give up and
             # answer without data, or spend its retries on something no SQL can fix.
             raise

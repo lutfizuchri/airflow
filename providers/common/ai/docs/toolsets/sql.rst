@@ -457,10 +457,13 @@ subqueries and joins.
   cannot be set up for ``list_tables`` or ``get_schema`` (a dialect it cannot
   load, a token it cannot fetch), or SQLAlchemy reports the connection lost
   while they run. With :doc:`../durable_execution` the retry queries the
-  database again instead of replaying the failure. The task log reads
-  ``Could not reach the database of connection '<id>': ...``, or
-  ``Connection '<id>' does not provide a DbApiHook`` when the connection is
-  of the wrong type. Inside :doc:`../code_mode` the split does not hold: a
+  database again instead of replaying the failure. The task fails with
+  :class:`~airflow.providers.common.ai.exceptions.SQLToolsetConnectionError`,
+  whose message reads ``Could not reach the database of connection '<id>': ...``,
+  or ``Connection '<id>' does not provide a DbApiHook`` when the connection is
+  of the wrong type. Match that class in a retry policy
+  (:doc:`../retry_policies`) to retry an unreachable database on a different
+  schedule from other failures. Inside :doc:`../code_mode` the split does not hold: a
   tool the model's code calls hands any exception back to the model as a
   retry, this one included.
   Once connected, an error from the statement becomes a ``ModelRetry`` so the
